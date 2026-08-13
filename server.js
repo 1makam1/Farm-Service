@@ -4,8 +4,10 @@
  * Zero dependencies: plain Node.js HTTP server, JSON file storage.
  *
  * Run:  node server.js        (then open http://localhost:3000)
- * Env:  PORT (default 3000), HOST (default 127.0.0.1), ADMIN_PASSWORD
- * Config/data are stored in ./data (created on first run).
+ * Env:  PORT (default 3000), HOST (default 127.0.0.1), ADMIN_PASSWORD, DATA_DIR
+ * Optional Supabase: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to store
+ * customers/items/services in the cloud (see scripts/setup-supabase.sql) so data
+ * survives redeploys. Otherwise JSON files in ./data (created on first run).
  */
 
 const http = require('http');
@@ -23,6 +25,15 @@ const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
 const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
 const SERVICES_FILE = path.join(DATA_DIR, 'services.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+
+// Optional Supabase backend: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (and the
+// project needs the kv_store table from scripts/setup-supabase.sql). When configured,
+// customers/items/services are stored in Supabase instead of local JSON files, so they
+// survive redeploys (e.g. Render). Uses PostgREST directly — no SDK, no dependencies.
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_TABLE = process.env.SUPABASE_TABLE || 'kv_store';
+const useSupabase = !!(SUPABASE_URL && SUPABASE_KEY);
 
 const SESSION_DAYS = 7;
 const MAX_BODY = 1 * 1024 * 1024; // 1 MB
@@ -64,49 +75,86 @@ function sha256(str) {
 
 const config = loadConfig();
 
-function loadData() {
-  if (fs.existsSync(DATA_FILE)) {
-    try {
-      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    } catch (e) {
-      console.error('[error] Could not parse data/accounts.json — starting fresh after backing up.');
-      fs.copyFileSync(DATA_FILE, DATA_FILE + '.bak-' + Date.now());
-    }
+// ---------------------------------------------------------------------------
+// Supabase (PostgREST) helpers — used when SUPABASE_URL + key are set.
+// One kv_store table (key text PK, value jsonb) mirrors the three local files.
+// ---------------------------------------------------------------------------
+
+async function supaFetch(method, query, body) {
+  const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}${query}`;
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  const opts = { method, headers };
+  if (body !== undefined) {
+    opts.body = JSON.stringify(body);
+    if (method === 'POST') headers.Prefer = 'resolution=merge-duplicates,return=representation';
+    else if (method === 'PATCH') headers.Prefer = 'return=representation';
   }
-  const seed = { customers: [demoCustomer()] };
-  saveData(seed);
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    throw new Error(`Supabase ${method} ${SUPABASE_TABLE}${query} failed (${r.status}): ${detail.slice(0, 300)}`);
+  }
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function supaLoad(key) {
+  const rows = await supaFetch('GET', `?key=eq.${encodeURIComponent(key)}&select=value&limit=1`);
+  return rows && rows.length ? rows[0].value : null;
+}
+
+async function supaSave(key, value) {
+  await supaFetch('POST', '', [{ key, value }]);
+}
+
+function readLocalJson(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.error('[warn] Could not parse ' + file + ' — backing it up and starting fresh.');
+    fs.copyFileSync(file, file + '.bak-' + Date.now());
+    return null;
+  }
+}
+
+async function loadData() {
+  if (useSupabase) {
+    const remote = await supaLoad('customers');
+    if (remote && remote.customers) return remote;
+    // First connect: migrate any local data file (excluding the old demo order),
+    // otherwise start with an empty customer list.
+    const local = readLocalJson(DATA_FILE);
+    const seed = {
+      customers: (local && local.customers || []).filter((c) => c.id !== 'demo-0001' && c.robloxUsername !== 'DemoPlayer123'),
+    };
+    if (seed.customers.length) console.log(`[supabase] migrated ${seed.customers.length} customers from local data`);
+    await supaSave('customers', seed);
+    return seed;
+  }
+  const local = readLocalJson(DATA_FILE);
+  if (local) return local;
+  const seed = { customers: [] };
+  await saveData(seed);
   return seed;
 }
 
-function saveData(next) {
+async function saveData(next) {
+  if (useSupabase) {
+    await supaSave('customers', next);
+    return;
+  }
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = DATA_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
   fs.renameSync(tmp, DATA_FILE);
 }
 
-function demoCustomer() {
-  const now = new Date().toISOString();
-  return {
-    id: 'demo-0001',
-    robloxUsername: 'DemoPlayer123',
-    service: 'Max Level 1 → 2600 + Buddha Mastery',
-    price: '15',
-    currency: 'USD',
-    status: 'in_progress',
-    notes: 'This is a sample order. Delete it from the admin dashboard and add your real customers.',
-    createdAt: now,
-    updatedAt: now,
-    progress: [
-      { id: 'demo-p1', label: 'Level 1 → 700 (Sea 1)', status: 'done', note: 'Completed in 6h', updatedAt: now },
-      { id: 'demo-p2', label: 'Level 700 → 1500 (Sea 2)', status: 'done', note: 'Completed in 9h', updatedAt: now },
-      { id: 'demo-p3', label: 'Level 1500 → 2600 (Sea 3)', status: 'in_progress', note: 'Roughly 40% done', updatedAt: now },
-      { id: 'demo-p4', label: 'Buddha Mastery 0 → 600', status: 'pending', note: '', updatedAt: now },
-    ],
-  };
-}
-
-let data = loadData();
+let data, itemData, serviceData;
 
 // ---------------------------------------------------------------------------
 // Items store (admin-managed catalog, seeded from the bundled items.js)
@@ -135,28 +183,33 @@ function seedItemsFromBundle() {
   }
 }
 
-function loadItems() {
-  if (fs.existsSync(ITEMS_FILE)) {
-    try {
-      return JSON.parse(fs.readFileSync(ITEMS_FILE, 'utf8'));
-    } catch (e) {
-      console.error('[error] Could not parse data/items.json — starting fresh after backing up.');
-      fs.copyFileSync(ITEMS_FILE, ITEMS_FILE + '.bak-' + Date.now());
-    }
+async function loadItems() {
+  if (useSupabase) {
+    const remote = await supaLoad('items');
+    if (remote && remote.items) return remote;
+    const local = readLocalJson(ITEMS_FILE);
+    const seed = local && local.items ? local : { items: seedItemsFromBundle() };
+    if (local && local.items) console.log(`[supabase] migrated ${seed.items.length} items from local data`);
+    await supaSave('items', seed);
+    return seed;
   }
+  const local = readLocalJson(ITEMS_FILE);
+  if (local) return local;
   const seed = { items: seedItemsFromBundle() };
-  saveItems(seed);
+  await saveItems(seed);
   return seed;
 }
 
-function saveItems(next) {
+async function saveItems(next) {
+  if (useSupabase) {
+    await supaSave('items', next);
+    return;
+  }
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = ITEMS_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
   fs.renameSync(tmp, ITEMS_FILE);
 }
-
-let itemData = loadItems();
 
 // ---------------------------------------------------------------------------
 // Services store (admin-managed service list, seeded with defaults)
@@ -181,32 +234,41 @@ const DEFAULT_SERVICES = [
   ['Material farming (per 99 stack)', '12 – 160'],
 ];
 
-function loadServices() {
-  if (fs.existsSync(SERVICES_FILE)) {
-    try {
-      return JSON.parse(fs.readFileSync(SERVICES_FILE, 'utf8'));
-    } catch (e) {
-      console.error('[error] Could not parse data/services.json — starting fresh after backing up.');
-      fs.copyFileSync(SERVICES_FILE, SERVICES_FILE + '.bak-' + Date.now());
-    }
+async function loadServices() {
+  if (useSupabase) {
+    const remote = await supaLoad('services');
+    if (remote && remote.services) return remote;
+    const local = readLocalJson(SERVICES_FILE);
+    const seed = local && local.services ? local : {
+      services: DEFAULT_SERVICES.map(([name, price]) => ({
+        id: crypto.randomUUID(), name, price, enabled: true,
+      })),
+    };
+    if (local && local.services) console.log(`[supabase] migrated ${seed.services.length} services from local data`);
+    await supaSave('services', seed);
+    return seed;
   }
+  const local = readLocalJson(SERVICES_FILE);
+  if (local) return local;
   const seed = {
     services: DEFAULT_SERVICES.map(([name, price]) => ({
       id: crypto.randomUUID(), name, price, enabled: true,
     })),
   };
-  saveServices(seed);
+  await saveServices(seed);
   return seed;
 }
 
-function saveServices(next) {
+async function saveServices(next) {
+  if (useSupabase) {
+    await supaSave('services', next);
+    return;
+  }
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = SERVICES_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
   fs.renameSync(tmp, SERVICES_FILE);
 }
-
-let serviceData = loadServices();
 
 function cleanService(body, existing) {
   const s = existing ? { ...existing } : {};
@@ -554,7 +616,7 @@ const server = http.createServer(async (req, res) => {
         customer.createdAt = now;
         customer.updatedAt = now;
         data.customers.unshift(customer);
-        saveData(data);
+        await saveData(data);
         return json(res, 201, { customer: publicCustomer(customer) });
       }
 
@@ -566,7 +628,7 @@ const server = http.createServer(async (req, res) => {
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         customer.updatedAt = new Date().toISOString();
         data.customers[idx] = customer;
-        saveData(data);
+        await saveData(data);
         return json(res, 200, { customer: publicCustomer(customer) });
       }
 
@@ -574,7 +636,7 @@ const server = http.createServer(async (req, res) => {
         const before = data.customers.length;
         data.customers = data.customers.filter((x) => x.id !== adminCustomerMatch[1]);
         if (data.customers.length === before) return json(res, 404, { error: 'Order not found' });
-        saveData(data);
+        await saveData(data);
         return json(res, 200, { ok: true });
       }
 
@@ -597,7 +659,7 @@ const server = http.createServer(async (req, res) => {
         };
         c.progress.push(item);
         c.updatedAt = item.updatedAt;
-        saveData(data);
+        await saveData(data);
         return json(res, 201, { item });
       }
 
@@ -612,7 +674,7 @@ const server = http.createServer(async (req, res) => {
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         item.id = crypto.randomUUID();
         itemData.items.push(item);
-        saveItems(itemData);
+        await saveItems(itemData);
         return json(res, 201, { item });
       }
 
@@ -624,7 +686,7 @@ const server = http.createServer(async (req, res) => {
         const { item, errs } = cleanItem(body, itemData.items[idx]);
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         itemData.items[idx] = item;
-        saveItems(itemData);
+        await saveItems(itemData);
         return json(res, 200, { item });
       }
 
@@ -632,7 +694,7 @@ const server = http.createServer(async (req, res) => {
         const before = itemData.items.length;
         itemData.items = itemData.items.filter((x) => x.id !== adminItemMatch[1]);
         if (itemData.items.length === before) return json(res, 404, { error: 'Item not found' });
-        saveItems(itemData);
+        await saveItems(itemData);
         return json(res, 200, { ok: true });
       }
 
@@ -648,7 +710,7 @@ const server = http.createServer(async (req, res) => {
           return json(res, 400, { error: 'Invalid service order' });
         }
         serviceData.services = ids.map((id) => serviceData.services.find((s) => s.id === id));
-        saveServices(serviceData);
+        await saveServices(serviceData);
         return json(res, 200, { ok: true });
       }
 
@@ -658,7 +720,7 @@ const server = http.createServer(async (req, res) => {
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         service.id = crypto.randomUUID();
         serviceData.services.push(service);
-        saveServices(serviceData);
+        await saveServices(serviceData);
         return json(res, 201, { service });
       }
 
@@ -670,7 +732,7 @@ const server = http.createServer(async (req, res) => {
         const { service, errs } = cleanService(body, serviceData.services[idx]);
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         serviceData.services[idx] = service;
-        saveServices(serviceData);
+        await saveServices(serviceData);
         return json(res, 200, { service });
       }
 
@@ -678,7 +740,7 @@ const server = http.createServer(async (req, res) => {
         const before = serviceData.services.length;
         serviceData.services = serviceData.services.filter((x) => x.id !== adminServiceMatch[1]);
         if (serviceData.services.length === before) return json(res, 404, { error: 'Service not found' });
-        saveServices(serviceData);
+        await saveServices(serviceData);
         return json(res, 200, { ok: true });
       }
 
@@ -693,9 +755,22 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`BloxFarm Tracker running →  http://${HOST}:${PORT}`);
-  console.log(`Public tracker:   http://${HOST}:${PORT}/`);
-  console.log(`Admin dashboard:  http://${HOST}:${PORT}/admin`);
-  console.log(`Price list page:  http://${HOST}:${PORT}/prices`);
-});
+async function main() {
+  try {
+    data = await loadData();
+    itemData = await loadItems();
+    serviceData = await loadServices();
+    if (useSupabase) console.log(`[supabase] storage: ${SUPABASE_URL} (table: ${SUPABASE_TABLE})`);
+    server.listen(PORT, HOST, () => {
+      console.log(`BloxFarm Tracker running →  http://${HOST}:${PORT}`);
+      console.log(`Public tracker:   http://${HOST}:${PORT}/`);
+      console.log(`Admin dashboard:  http://${HOST}:${PORT}/admin`);
+      console.log(`Price list page:  http://${HOST}:${PORT}/prices`);
+    });
+  } catch (e) {
+    console.error('[fatal] Could not start server:', e);
+    process.exit(1);
+  }
+}
+
+main();
