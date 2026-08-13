@@ -235,7 +235,151 @@ async function doLogout() {
   showLogin();
 }
 
+// ---------------------------------------------------------------- items tab
+const ITEM_CATS = [
+  { id: 'styles', label: 'Fighting Styles' },
+  { id: 'swords', label: 'Swords' },
+  { id: 'guns', label: 'Guns' },
+  { id: 'materials', label: 'Materials' },
+];
+
+let items = [];
+let itemFilter = '';
+let newIdCounter = 0;
+
+function switchView(v) {
+  const orders = v === 'orders';
+  $('tabOrders').classList.toggle('active', orders);
+  $('tabItems').classList.toggle('active', !orders);
+  $('ordersToolbar').classList.toggle('hidden', !orders);
+  $('ordersSection').classList.toggle('hidden', !orders);
+  $('itemsSection').classList.toggle('hidden', orders);
+  if (!orders) refreshItems();
+}
+
+async function refreshItems() {
+  try {
+    const { items: list } = await api('/api/admin/items');
+    items = list;
+    renderItems();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function rowHTML(it) {
+  const id = it.id || '';
+  return `
+  <div class="item-row" data-id="${esc(id)}">
+    <img class="item-thumb" src="${esc(it.image || '')}" alt="" onerror="this.style.visibility='hidden'">
+    <input data-f="name" value="${esc(it.name)}" placeholder="Item name">
+    <select data-f="category">${ITEM_CATS.map((c) => `<option value="${c.id}" ${it.category === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
+    <select data-f="rarity">${['Legendary', 'Mythical'].map((r) => `<option ${it.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+    <input type="number" data-f="price" value="${esc(it.price)}" min="0" title="Price in THB">
+    <input data-f="image" value="${esc(it.image || '')}" placeholder="Image URL or /img/items/x.webp">
+    <input data-f="cost" value="${esc(it.cost || '')}" placeholder="How to get (optional)">
+    <label class="enabled-toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${it.enabled ? 'checked' : ''}> Enabled</label>
+    <button class="btn btn-small" data-act="save">Save</button>
+    <button class="btn btn-danger btn-small" data-act="del" title="Delete item">✕</button>
+  </div>`;
+}
+
+function renderItems() {
+  const f = itemFilter.toLowerCase();
+  const rows = items.filter((i) => !f || i.name.toLowerCase().includes(f));
+  $('itemCount').textContent = `${items.length} total · ${rows.length} shown`;
+  $('itemsList').innerHTML = rows.length
+    ? rows.map(rowHTML).join('')
+    : '<div class="empty">No items yet. Click “+ Add Item” to create one.</div>';
+}
+
+function findItemByRow(row) {
+  return items.find((x) => (x.id || '') === row.dataset.id);
+}
+
+$('itemsList').addEventListener('input', (e) => {
+  const f = e.target.dataset.f;
+  if (!f) return;
+  const it = findItemByRow(e.target.closest('.item-row'));
+  if (!it) return;
+  it[f] = f === 'enabled' ? e.target.checked : (f === 'price' ? Number(e.target.value) : e.target.value);
+});
+
+$('itemsList').addEventListener('change', (e) => {
+  const f = e.target.dataset.f;
+  if (!f || f === 'enabled') {
+    const it = findItemByRow(e.target.closest('.item-row'));
+    if (it && f === 'enabled') it.enabled = e.target.checked;
+  }
+});
+
+$('itemsList').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const row = btn.closest('.item-row');
+  const id = row.dataset.id;
+  if (btn.dataset.act === 'save') saveItem(id);
+  else if (btn.dataset.act === 'del') deleteItem(id);
+});
+
+window.addItemRow = function () {
+  items.unshift({ id: 'new-' + (++newIdCounter), name: '', category: 'swords', rarity: 'Legendary', price: 0, image: '', cost: '', enabled: true });
+  renderItems();
+  const first = $('itemsList').querySelector('input[data-f="name"]');
+  if (first) first.focus();
+};
+
+async function saveItem(id) {
+  const it = items.find((x) => (x.id || '') === id);
+  if (!it) return;
+  if (!it.name.trim()) return toast('Item name is required', true);
+  const isNew = String(id).startsWith('new-');
+  const payload = {
+    name: it.name.trim(), category: it.category, rarity: it.rarity,
+    price: it.price, image: it.image, cost: it.cost, note: it.note || '', enabled: it.enabled !== false,
+  };
+  try {
+    if (isNew) {
+      const res = await api('/api/admin/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      items = items.map((x) => (x.id === id ? res.item : x));
+      toast('Item added ✔');
+    } else {
+      await api('/api/admin/items/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      toast('Item saved ✔');
+    }
+    await refreshItems();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function deleteItem(id) {
+  if (String(id).startsWith('new-')) {
+    items = items.filter((x) => (x.id || '') !== id);
+    renderItems();
+    return;
+  }
+  const it = items.find((x) => (x.id || '') === id);
+  if (!confirm(`Delete "${it ? it.name : 'this item'}" from the catalog?`)) return;
+  try {
+    await api('/api/admin/items/' + encodeURIComponent(id), { method: 'DELETE' });
+    toast('Item deleted');
+    await refreshItems();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
 // ---------------------------------------------------------------- wire up
+$('tabOrders').addEventListener('click', () => switchView('orders'));
+$('tabItems').addEventListener('click', () => switchView('items'));
+$('addItemBtn').addEventListener('click', addItemRow);
+$('itemFilter').addEventListener('input', (e) => {
+  itemFilter = e.target.value;
+  clearTimeout(listTimer);
+  listTimer = setTimeout(renderItems, 150);
+});
+
 $('loginBtn').addEventListener('click', doLogin);
 $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 $('logoutBtn').addEventListener('click', doLogout);

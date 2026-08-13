@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>แกลเลอรีไอเทม — BloxFarm Service</title>
+  <title>Prices — BloxFarm Service</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -17,13 +17,13 @@
   </header>
 
   <main class="container">
-    <h1>แกลเลอรีไอเทม (THB)</h1>
-    <p class="sub">ไอเทมระดับ Legendary และ Mythical เท่านั้น — คลิกที่รูปเพื่อดูราคา เลื่อนหาไอเทมที่ต้องการ หรือดูราคาบริการทั้งหมดด้านล่าง</p>
+    <h1>Item Gallery (THB)</h1>
+    <p class="sub">Legendary &amp; Mythical items only — click a card to see its details. Full service rates are in the table below.</p>
 
-    <h2>บริการทั่วไป (Services)</h2>
+    <h2>Services</h2>
     <div class="card">
       <table>
-        <thead><tr><th>Service</th><th class="num">ราคา (THB)</th></tr></thead>
+        <thead><tr><th>Service</th><th class="num">Price (THB)</th></tr></thead>
         <tbody>
           <tr><td>Leveling 1 → 700 (Sea 1)</td><td class="num">12</td></tr>
           <tr><td>Leveling 700 → 1,500 (Sea 2)</td><td class="num">24</td></tr>
@@ -43,32 +43,32 @@
           <tr><td>Material farming (per 99 stack)</td><td class="num">12 – 160</td></tr>
         </tbody>
       </table>
-      <p class="price-note">มัดจำ 50% ก่อนเริ่มงาน · งานใหญ่ผ่อนจ่ายเป็นงวดตามไมล์สโตน · ราคาต่อรองได้สำหรับแพ็กเกจ/ซื้อหลายอย่าง</p>
+      <p class="price-note">50% deposit required to start. Milestone payments for big orders. Prices negotiable for bundles.</p>
     </div>
 
-    <h2>ไอเทมทั้งหมด (Legendary + Mythical)</h2>
+    <h2>All Items (Legendary + Mythical)</h2>
     <div class="toolbar">
       <div class="filter-pills" id="catPills">
-        <button class="btn btn-small active" data-cat="all">ทั้งหมด</button>
-        <button class="btn btn-small" data-cat="styles">สไตล์ต่อสู้</button>
-        <button class="btn btn-small" data-cat="swords">ดาบ</button>
-        <button class="btn btn-small" data-cat="guns">ปืน</button>
-        <button class="btn btn-small" data-cat="materials">วัสดุ</button>
+        <button class="btn btn-small active" data-cat="all">All</button>
+        <button class="btn btn-small" data-cat="styles">Fighting Styles</button>
+        <button class="btn btn-small" data-cat="swords">Swords</button>
+        <button class="btn btn-small" data-cat="guns">Guns</button>
+        <button class="btn btn-small" data-cat="materials">Materials</button>
       </div>
       <div class="spacer"></div>
       <select id="sortSel" style="max-width:180px">
-        <option value="">เรียง: เริ่มต้น</option>
-        <option value="price_asc">เรียง: ราคา ต่ำ → สูง</option>
-        <option value="price_desc">เรียง: ราคา สูง → ต่ำ</option>
-        <option value="rarity">เรียง: ความหายาก</option>
+        <option value="">Sort: Default</option>
+        <option value="price_asc">Sort: Price Low → High</option>
+        <option value="price_desc">Sort: Price High → Low</option>
+        <option value="rarity">Sort: Rarity</option>
       </select>
-      <input type="text" id="galSearch" placeholder="ค้นหาไอเทม…" style="max-width:220px">
+      <input type="text" id="galSearch" placeholder="Search items…" style="max-width:220px">
     </div>
 
     <div class="gallery" id="gallery"></div>
-    <div class="empty hidden" id="galEmpty">ไม่พบไอเทมที่ค้นหา</div>
+    <div class="empty hidden" id="galEmpty">No items match your search.</div>
 
-    <p class="price-note" style="margin-top:24px">ราคาไอเทมทุกชิ้นคิดเป็นเงินบาทไทย (THB) — ราคาค่าบริการทำให้ได้ไอเทมนั้น ๆ · วัสดุคิดต่อ 99 ชิ้น</p>
+    <p class="price-note" style="margin-top:24px">All prices are in Thai Baht (THB) — the price is the service fee to get that item for you. Materials are priced per 99-stack.</p>
   </main>
 
   <script src="/js/items.js"></script>

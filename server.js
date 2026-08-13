@@ -19,6 +19,7 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const DATA_DIR = path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
+const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
 const SESSION_DAYS = 7;
@@ -104,6 +105,86 @@ function demoCustomer() {
 }
 
 let data = loadData();
+
+// ---------------------------------------------------------------------------
+// Items store (admin-managed catalog, seeded from the bundled items.js)
+// ---------------------------------------------------------------------------
+
+function seedItemsFromBundle() {
+  try {
+    const src = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'items.js'), 'utf8');
+    const m = src.match(/GALLERY_ITEMS = (\[.*?\]);/s);
+    if (!m) return [];
+    const arr = JSON.parse(m[1]);
+    return arr.map((it) => ({
+      id: crypto.randomUUID(),
+      name: it.name,
+      category: it.cat,
+      rarity: it.rarity,
+      price: Number(it.price) || 0,
+      image: it.img || '',
+      cost: it.cost || '',
+      note: it.note || '',
+      enabled: true,
+    }));
+  } catch (e) {
+    console.error('[warn] Could not seed items from public/js/items.js:', e.message);
+    return [];
+  }
+}
+
+function loadItems() {
+  if (fs.existsSync(ITEMS_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(ITEMS_FILE, 'utf8'));
+    } catch (e) {
+      console.error('[error] Could not parse data/items.json — starting fresh after backing up.');
+      fs.copyFileSync(ITEMS_FILE, ITEMS_FILE + '.bak-' + Date.now());
+    }
+  }
+  const seed = { items: seedItemsFromBundle() };
+  saveItems(seed);
+  return seed;
+}
+
+function saveItems(next) {
+  itemData = next || itemData;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = ITEMS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(itemData, null, 2));
+  fs.renameSync(tmp, ITEMS_FILE);
+}
+
+let itemData = loadItems();
+
+const ITEM_CATEGORIES = ['styles', 'swords', 'guns', 'materials'];
+const ITEM_RARITIES = ['Legendary', 'Mythical'];
+
+function cleanItem(body, existing) {
+  const it = existing ? { ...existing } : {};
+  const errs = [];
+
+  it.name = String(body.name !== undefined ? body.name : (existing && existing.name) || '').trim();
+  if (!it.name) errs.push('name is required');
+
+  if (body.category !== undefined) it.category = String(body.category);
+  else if (!it.category) it.category = 'swords';
+  if (!ITEM_CATEGORIES.includes(it.category)) errs.push('Invalid category');
+
+  if (body.rarity !== undefined) it.rarity = String(body.rarity);
+  else if (!it.rarity) it.rarity = 'Legendary';
+  if (!ITEM_RARITIES.includes(it.rarity)) errs.push('Invalid rarity');
+
+  const priceNum = body.price !== undefined ? Number(body.price) : (existing && Number(existing.price)) || 0;
+  it.price = isNaN(priceNum) || priceNum < 0 ? 0 : Math.round(priceNum);
+
+  it.image = String(body.image !== undefined ? body.image : (existing && existing.image) || '').trim();
+  it.cost = String(body.cost !== undefined ? body.cost : (existing && existing.cost) || '').trim();
+  it.note = String(body.note !== undefined ? body.note : (existing && existing.note) || '').trim();
+  it.enabled = body.enabled !== undefined ? !!body.enabled : (existing ? existing.enabled !== false : true);
+
+  return { item: it, errs };
+}
 
 // ---------------------------------------------------------------------------
 // Auth (HMAC-signed cookie, no session store needed)
@@ -331,6 +412,17 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { customer: publicCustomer(c) });
     }
 
+    // ---- Public item catalog (enabled items only) ----
+    if (method === 'GET' && p === '/api/items') {
+      const list = itemData.items
+        .filter((i) => i.enabled !== false)
+        .map((i) => ({
+          id: i.id, name: i.name, category: i.category, rarity: i.rarity,
+          price: i.price, image: i.image, cost: i.cost || '', note: i.note || '',
+        }));
+      return json(res, 200, { items: list });
+    }
+
     // ---- Auth ----
     if (method === 'POST' && p === '/api/login') {
       const body = await readBody(req);
@@ -435,6 +527,41 @@ const server = http.createServer(async (req, res) => {
         c.updatedAt = item.updatedAt;
         saveData(data);
         return json(res, 201, { item });
+      }
+
+      // ---- Item catalog management (add / edit / delete / enable-disable) ----
+      if (method === 'GET' && p === '/api/admin/items') {
+        return json(res, 200, { items: itemData.items });
+      }
+
+      if (method === 'POST' && p === '/api/admin/items') {
+        const body = await readBody(req);
+        const { item, errs } = cleanItem(body, null);
+        if (errs.length) return json(res, 400, { error: errs.join('; ') });
+        item.id = crypto.randomUUID();
+        itemData.items.push(item);
+        saveItems();
+        return json(res, 201, { item });
+      }
+
+      const adminItemMatch = p.match(/^\/api\/admin\/items\/([\w-]+)$/);
+      if (method === 'PUT' && adminItemMatch) {
+        const idx = itemData.items.findIndex((x) => x.id === adminItemMatch[1]);
+        if (idx < 0) return json(res, 404, { error: 'Item not found' });
+        const body = await readBody(req);
+        const { item, errs } = cleanItem(body, itemData.items[idx]);
+        if (errs.length) return json(res, 400, { error: errs.join('; ') });
+        itemData.items[idx] = item;
+        saveItems();
+        return json(res, 200, { item });
+      }
+
+      if (method === 'DELETE' && adminItemMatch) {
+        const before = itemData.items.length;
+        itemData.items = itemData.items.filter((x) => x.id !== adminItemMatch[1]);
+        if (itemData.items.length === before) return json(res, 404, { error: 'Item not found' });
+        saveItems();
+        return json(res, 200, { ok: true });
       }
 
       return json(res, 404, { error: 'Unknown admin route' });
