@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Your Order — BloxFarm Service</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">Blox<span>Farm</span> Tracker</div>
+    <nav class="nav">
+      <a href="/" class="active">Track Order</a>
+      <a href="/prices">Prices</a>
+      <a href="/admin">Admin</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Track your Blox Fruits order</h1>
+      <p class="sub">Enter your Roblox username below to see the live progress of your farming service.</p>
+      <div class="search-box">
+        <input type="text" id="search" placeholder="Roblox username, e.g. Bloxxer123" autocomplete="off">
+        <button class="btn btn-primary" id="searchBtn">Search</button>
+      </div>
+    </section>
+
+    <section id="results" class="hidden">
+      <h2>Orders found</h2>
+      <div id="resultsList"></div>
+    </section>
+
+    <section id="detail" class="hidden">
+      <div id="detailBody"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/js/customer.js"></script>
+</body>
+</html>

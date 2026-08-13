@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — BloxFarm Tracker</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">Blox<span>Farm</span> Tracker</div>
+    <nav class="nav">
+      <a href="/">Track Order</a>
+      <a href="/prices">Prices</a>
+      <a href="/admin" class="active">Admin</a>
+    </nav>
+  </header>
+
+  <!-- Login view -->
+  <main class="container" id="loginView">
+    <div class="card login-card">
+      <h2>Admin Login</h2>
+      <p class="sub" style="margin-bottom:10px">Enter the admin password to manage orders.</p>
+      <input type="password" id="password" placeholder="Admin password" autocomplete="current-password">
+      <button class="btn btn-primary" id="loginBtn" style="width:100%;margin-top:14px">Log in</button>
+    </div>
+  </main>
+
+  <!-- Dashboard view -->
+  <main class="container wide hidden" id="dashView">
+    <div class="toolbar">
+      <h1 style="margin:0">Orders</h1>
+      <span id="countLabel" class="sub" style="margin:0"></span>
+      <div class="spacer"></div>
+      <input type="text" id="filter" placeholder="Filter by username…" style="max-width:200px">
+      <button class="btn btn-green" id="newBtn">+ New Order</button>
+      <button class="btn btn-ghost" id="logoutBtn">Log out</button>
+    </div>
+
+    <div class="admin-layout">
+      <div>
+        <div class="card" style="padding:10px">
+          <div class="admin-list" id="customerList"></div>
+        </div>
+      </div>
+
+      <div class="card" id="editor">
+        <div style="display:flex;align-items:center;gap:10px">
+          <h2 id="editorTitle" style="margin:0">Select an order to edit</h2>
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn btn-danger btn-small hidden" id="deleteBtn">Delete order</button>
+        </div>
+        <div id="editorBody"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

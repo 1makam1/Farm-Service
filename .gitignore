@@ -1,0 +1,13 @@
+# App data — contains admin password, session secret & customer records. NEVER publish.
+data/
+
+# Freebuff app metadata
+.freebuff/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# Node
+node_modules/
