@@ -46,6 +46,23 @@ function showDash() {
   $('loginView').classList.add('hidden');
   $('dashView').classList.remove('hidden');
   refreshList();
+  refreshStorageBadge();
+}
+
+async function refreshStorageBadge() {
+  const el = $('storageBadge');
+  try {
+    const st = await api('/api/status');
+    if (st.supabase) {
+      el.textContent = '☁️ Supabase'; el.className = 'storage-badge ok';
+      el.title = 'Data stored in Supabase — survives redeploys';
+    } else {
+      el.textContent = '💾 Local files'; el.className = 'storage-badge';
+      el.title = 'Data stored in local data/ files — use SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to enable cloud storage';
+    }
+  } catch (e) {
+    el.textContent = '?'; el.className = 'storage-badge';
+  }
 }
 
 // ---------------------------------------------------------------- list

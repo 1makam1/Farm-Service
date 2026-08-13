@@ -538,6 +538,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { customer: publicCustomer(c) });
     }
 
+    // ---- Storage status (public, informational only) ----
+    if (method === 'GET' && p === '/api/status') {
+      return json(res, 200, { supabase: useSupabase, url: SUPABASE_URL || null });
+    }
+
     // ---- Public item catalog (enabled items only) ----
     if (method === 'GET' && p === '/api/items') {
       const list = itemData.items
