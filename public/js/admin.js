@@ -409,6 +409,10 @@ function serviceRowHTML(s) {
   return `
   <div class="service-row" data-id="${esc(id)}">
     <div class="ir-top">
+      <div class="reorder">
+        <button class="btn btn-small btn-ghost" data-act="up" title="Move up">↑</button>
+        <button class="btn btn-small btn-ghost" data-act="down" title="Move down">↓</button>
+      </div>
       <div class="field ir-name-field">
         <label>Service name</label>
         <input class="ir-name" data-f="name" value="${esc(s.name)}" placeholder="e.g. Full leveling 1 → 2,600 (max)">
@@ -462,8 +466,11 @@ $('servicesList').addEventListener('click', (e) => {
   if (!btn) return;
   const row = btn.closest('.service-row');
   const id = row.dataset.id;
-  if (btn.dataset.act === 'save') saveService(id);
-  else if (btn.dataset.act === 'del') deleteService(id);
+  const act = btn.dataset.act;
+  if (act === 'save') saveService(id);
+  else if (act === 'del') deleteService(id);
+  else if (act === 'up') moveService(id, -1);
+  else if (act === 'down') moveService(id, 1);
 });
 
 window.addServiceRow = function () {
@@ -518,6 +525,29 @@ async function deleteService(id) {
     await refreshServices();
   } catch (e) {
     toast(e.message, true);
+  }
+}
+
+async function moveService(id, dir) {
+  if (services.some((x) => String(x.id).startsWith('new-'))) {
+    return toast('Save new services before reordering', true);
+  }
+  if (serviceFilter.trim()) {
+    return toast('Clear the search filter to reorder', true);
+  }
+  const idx = services.findIndex((x) => (x.id || '') === id);
+  const swap = idx + dir;
+  if (idx < 0 || swap < 0 || swap >= services.length) return;
+  [services[idx], services[swap]] = [services[swap], services[idx]];
+  try {
+    await api('/api/admin/services/order', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: services.map((s) => s.id) }),
+    });
+    renderServices();
+  } catch (e) {
+    toast(e.message, true);
+    await refreshServices();
   }
 }
 

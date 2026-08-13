@@ -636,9 +636,20 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
 
-      // ---- Service management (add / edit / delete / enable-disable) ----
+      // ---- Service management (add / edit / delete / enable-disable / reorder) ----
       if (method === 'GET' && p === '/api/admin/services') {
         return json(res, 200, { services: serviceData.services });
+      }
+
+      if (method === 'PUT' && p === '/api/admin/services/order') {
+        const body = await readBody(req);
+        const ids = Array.isArray(body.ids) ? body.ids : [];
+        if (ids.length !== serviceData.services.length || !ids.every((id) => serviceData.services.some((s) => s.id === id))) {
+          return json(res, 400, { error: 'Invalid service order' });
+        }
+        serviceData.services = ids.map((id) => serviceData.services.find((s) => s.id === id));
+        saveServices(serviceData);
+        return json(res, 200, { ok: true });
       }
 
       if (method === 'POST' && p === '/api/admin/services') {
