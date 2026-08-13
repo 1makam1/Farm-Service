@@ -274,16 +274,24 @@ function rowHTML(it) {
   const id = it.id || '';
   return `
   <div class="item-row" data-id="${esc(id)}">
-    <img class="item-thumb" src="${esc(it.image || '')}" alt="" onerror="this.style.visibility='hidden'">
-    <input data-f="name" value="${esc(it.name)}" placeholder="Item name">
-    <select data-f="category">${ITEM_CATS.map((c) => `<option value="${c.id}" ${it.category === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
-    <select data-f="rarity">${['Legendary', 'Mythical'].map((r) => `<option ${it.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
-    <input type="number" data-f="price" value="${esc(it.price)}" min="0" title="Price in THB">
-    <input data-f="image" value="${esc(it.image || '')}" placeholder="Image URL or /img/items/x.webp">
-    <input data-f="cost" value="${esc(it.cost || '')}" placeholder="How to get (optional)">
-    <label class="enabled-toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${it.enabled ? 'checked' : ''}> Enabled</label>
-    <button class="btn btn-small" data-act="save">Save</button>
-    <button class="btn btn-danger btn-small" data-act="del" title="Delete item">✕</button>
+    <div class="ir-top">
+      <img class="item-thumb" src="${esc(it.image || '')}" alt="" onerror="this.style.visibility='hidden'">
+      <input class="ir-name" data-f="name" value="${esc(it.name)}" placeholder="Item name">
+      <label class="toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${it.enabled ? 'checked' : ''}><span class="tk"></span><span>Enabled</span></label>
+    </div>
+    <div class="ir-mid">
+      <input data-f="image" value="${esc(it.image || '')}" placeholder="Image URL or /img/items/x.webp">
+      <input type="number" data-f="price" value="${esc(it.price)}" min="0" placeholder="Price (THB)">
+      <select data-f="category">${ITEM_CATS.map((c) => `<option value="${c.id}" ${it.category === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
+      <select data-f="rarity">${['Legendary', 'Mythical'].map((r) => `<option ${it.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+    </div>
+    <div class="ir-bottom">
+      <input data-f="cost" value="${esc(it.cost || '')}" placeholder="How to get (optional)">
+      <div class="ir-actions">
+        <button class="btn btn-small" data-act="save">Save</button>
+        <button class="btn btn-danger btn-small" data-act="del" title="Delete item">✕</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -382,11 +390,17 @@ function serviceRowHTML(s) {
   const id = s.id || '';
   return `
   <div class="service-row" data-id="${esc(id)}">
-    <input data-f="name" value="${esc(s.name)}" placeholder="Service name">
-    <input data-f="price" value="${esc(s.price)}" placeholder="Price (THB)">
-    <label class="enabled-toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${s.enabled ? 'checked' : ''}> Enabled</label>
-    <button class="btn btn-small" data-act="save">Save</button>
-    <button class="btn btn-danger btn-small" data-act="del" title="Delete service">✕</button>
+    <div class="ir-top">
+      <input class="ir-name" data-f="name" value="${esc(s.name)}" placeholder="Service name">
+      <label class="toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${s.enabled ? 'checked' : ''}><span class="tk"></span><span>Enabled</span></label>
+    </div>
+    <div class="ir-bottom">
+      <input data-f="price" value="${esc(s.price)}" placeholder="Price (THB)">
+      <div class="ir-actions">
+        <button class="btn btn-small" data-act="save">Save</button>
+        <button class="btn btn-danger btn-small" data-act="del" title="Delete service">✕</button>
+      </div>
+    </div>
   </div>`;
 }
 
