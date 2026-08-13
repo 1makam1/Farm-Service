@@ -31,6 +31,7 @@
     <div class="tabs">
       <button class="btn btn-small active" id="tabOrders">📦 Orders</button>
       <button class="btn btn-small" id="tabItems">🛍️ Items</button>
+      <button class="btn btn-small" id="tabServices">🧰 Services</button>
       <div class="spacer"></div>
       <button class="btn btn-ghost" id="logoutBtn">Log out</button>
     </div>
@@ -72,6 +73,18 @@
       </div>
       <div id="itemsList"></div>
       <p class="price-note">Edit prices, rename items, change category/rarity, paste an image URL, and use the <strong>Enabled</strong> checkbox to show or hide an item on the public Prices page. Disabled items stay in the list but are hidden from customers.</p>
+    </div>
+
+    <div id="servicesSection" class="hidden">
+      <div class="toolbar">
+        <h2 style="margin:0">Services</h2>
+        <span id="serviceCount" class="sub" style="margin:0"></span>
+        <div class="spacer"></div>
+        <input type="text" id="serviceFilter" placeholder="Filter services…" style="max-width:180px">
+        <button class="btn btn-green" id="addServiceBtn">+ Add Service</button>
+      </div>
+      <div id="servicesList"></div>
+      <p class="price-note">Add or edit services (leveling, mastery, raids…), set the price, and use the <strong>Enabled</strong> checkbox to show or hide a service on the public Prices page.</p>
     </div>
   </main>
 

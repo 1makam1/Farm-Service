@@ -21,6 +21,7 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
 const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
+const SERVICES_FILE = path.join(DATA_DIR, 'services.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
 const SESSION_DAYS = 7;
@@ -156,6 +157,69 @@ function saveItems(next) {
 }
 
 let itemData = loadItems();
+
+// ---------------------------------------------------------------------------
+// Services store (admin-managed service list, seeded with defaults)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SERVICES = [
+  ['Leveling 1 → 700 (Sea 1)', '12'],
+  ['Leveling 700 → 1,500 (Sea 2)', '24'],
+  ['Leveling 1,500 → 2,600 (Sea 3)', '36'],
+  ['Full leveling 1 → 2,600 (max)', '70'],
+  ['Fruit mastery 0 → 600', '24'],
+  ['Sword mastery 0 → 600', '24'],
+  ['Gun mastery 0 → 600', '24'],
+  ['Fighting style mastery 0 → 600', '24'],
+  ['Raid carry (per raid, fragments farmed for you)', '3'],
+  ['Full awakening — 50 raids (Dough / Phoenix / etc.)', '120'],
+  ['Buddha awakening', '70'],
+  ['Race V4 unlock', '80'],
+  ['Bounty / Honor farming (per 1M)', '20'],
+  ['Sea Events farming (per hour)', '20'],
+  ['Boss farming / drops (per hour)', '20'],
+  ['Material farming (per 99 stack)', '12 – 160'],
+];
+
+function loadServices() {
+  if (fs.existsSync(SERVICES_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(SERVICES_FILE, 'utf8'));
+    } catch (e) {
+      console.error('[error] Could not parse data/services.json — starting fresh after backing up.');
+      fs.copyFileSync(SERVICES_FILE, SERVICES_FILE + '.bak-' + Date.now());
+    }
+  }
+  const seed = {
+    services: DEFAULT_SERVICES.map(([name, price]) => ({
+      id: crypto.randomUUID(), name, price, enabled: true,
+    })),
+  };
+  saveServices(seed);
+  return seed;
+}
+
+function saveServices(next) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = SERVICES_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+  fs.renameSync(tmp, SERVICES_FILE);
+}
+
+let serviceData = loadServices();
+
+function cleanService(body, existing) {
+  const s = existing ? { ...existing } : {};
+  const errs = [];
+
+  s.name = String(body.name !== undefined ? body.name : (existing && existing.name) || '').trim();
+  if (!s.name) errs.push('name is required');
+
+  s.price = String(body.price !== undefined ? body.price : (existing && existing.price) || '').trim();
+  s.enabled = body.enabled !== undefined ? !!body.enabled : (existing ? existing.enabled !== false : true);
+
+  return { service: s, errs };
+}
 
 const ITEM_CATEGORIES = ['styles', 'swords', 'guns', 'materials'];
 const ITEM_RARITIES = ['Legendary', 'Mythical'];
@@ -423,6 +487,14 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { items: list });
     }
 
+    // ---- Public service list (enabled only) ----
+    if (method === 'GET' && p === '/api/services') {
+      const list = serviceData.services
+        .filter((s) => s.enabled !== false)
+        .map((s) => ({ id: s.id, name: s.name, price: s.price }));
+      return json(res, 200, { services: list });
+    }
+
     // ---- Auth ----
     if (method === 'POST' && p === '/api/login') {
       const body = await readBody(req);
@@ -561,6 +633,41 @@ const server = http.createServer(async (req, res) => {
         itemData.items = itemData.items.filter((x) => x.id !== adminItemMatch[1]);
         if (itemData.items.length === before) return json(res, 404, { error: 'Item not found' });
         saveItems(itemData);
+        return json(res, 200, { ok: true });
+      }
+
+      // ---- Service management (add / edit / delete / enable-disable) ----
+      if (method === 'GET' && p === '/api/admin/services') {
+        return json(res, 200, { services: serviceData.services });
+      }
+
+      if (method === 'POST' && p === '/api/admin/services') {
+        const body = await readBody(req);
+        const { service, errs } = cleanService(body, null);
+        if (errs.length) return json(res, 400, { error: errs.join('; ') });
+        service.id = crypto.randomUUID();
+        serviceData.services.push(service);
+        saveServices(serviceData);
+        return json(res, 201, { service });
+      }
+
+      const adminServiceMatch = p.match(/^\/api\/admin\/services\/([\w-]+)$/);
+      if (method === 'PUT' && adminServiceMatch) {
+        const idx = serviceData.services.findIndex((x) => x.id === adminServiceMatch[1]);
+        if (idx < 0) return json(res, 404, { error: 'Service not found' });
+        const body = await readBody(req);
+        const { service, errs } = cleanService(body, serviceData.services[idx]);
+        if (errs.length) return json(res, 400, { error: errs.join('; ') });
+        serviceData.services[idx] = service;
+        saveServices(serviceData);
+        return json(res, 200, { service });
+      }
+
+      if (method === 'DELETE' && adminServiceMatch) {
+        const before = serviceData.services.length;
+        serviceData.services = serviceData.services.filter((x) => x.id !== adminServiceMatch[1]);
+        if (serviceData.services.length === before) return json(res, 404, { error: 'Service not found' });
+        saveServices(serviceData);
         return json(res, 200, { ok: true });
       }
 

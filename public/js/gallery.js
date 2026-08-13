@@ -54,6 +54,44 @@ function render() {
   document.getElementById('galEmpty').classList.toggle('hidden', list.length > 0);
 }
 
+const DEFAULT_SERVICES = [
+  ['Leveling 1 → 700 (Sea 1)', '12'],
+  ['Leveling 700 → 1,500 (Sea 2)', '24'],
+  ['Leveling 1,500 → 2,600 (Sea 3)', '36'],
+  ['Full leveling 1 → 2,600 (max)', '70'],
+  ['Fruit mastery 0 → 600', '24'],
+  ['Sword mastery 0 → 600', '24'],
+  ['Gun mastery 0 → 600', '24'],
+  ['Fighting style mastery 0 → 600', '24'],
+  ['Raid carry (per raid, fragments farmed for you)', '3'],
+  ['Full awakening — 50 raids (Dough / Phoenix / etc.)', '120'],
+  ['Buddha awakening', '70'],
+  ['Race V4 unlock', '80'],
+  ['Bounty / Honor farming (per 1M)', '20'],
+  ['Sea Events farming (per hour)', '20'],
+  ['Boss farming / drops (per hour)', '20'],
+  ['Material farming (per 99 stack)', '12 – 160'],
+];
+
+function renderServices(list) {
+  const body = document.getElementById('servicesBody');
+  if (!body) return;
+  body.innerHTML = list.length
+    ? list.map((s) => `<tr><td>${esc(s.name)}</td><td class="num">${esc(s.price)}</td></tr>`).join('')
+    : '<tr><td colspan="2" class="empty">No services listed yet.</td></tr>';
+}
+
+async function loadServices() {
+  try {
+    const r = await fetch('/api/services');
+    if (!r.ok) throw new Error('API unavailable');
+    const j = await r.json();
+    renderServices(j.services || []);
+  } catch (e) {
+    renderServices(DEFAULT_SERVICES.map(([name, price]) => ({ name, price })));
+  }
+}
+
 async function loadItems() {
   try {
     const r = await fetch('/api/items');
@@ -90,3 +128,4 @@ document.getElementById('sortSel').addEventListener('change', (e) => {
 });
 
 loadItems();
+loadServices();

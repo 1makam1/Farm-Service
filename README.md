@@ -64,8 +64,10 @@ For a public site, deploy the folder to any Node host (Render, Railway, Fly.io, 
 ## Data
 
 - `data/accounts.json` — your orders. Edit it only while the server is stopped.
+- `data/items.json` — the item catalog (manage from Admin → Items).
+- `data/services.json` — the service list (manage from Admin → Services).
 - `data/config.json` — admin password + session secret. Keep it secret.
-- Backups: the server keeps a timestamped copy of `accounts.json` if it ever fails to parse.
+- Backups: the server keeps a timestamped copy of a data file if it ever fails to parse.
 
 ## API overview
 

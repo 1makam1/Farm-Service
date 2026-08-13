@@ -250,11 +250,14 @@ let newIdCounter = 0;
 function switchView(v) {
   const orders = v === 'orders';
   $('tabOrders').classList.toggle('active', orders);
-  $('tabItems').classList.toggle('active', !orders);
+  $('tabItems').classList.toggle('active', v === 'items');
+  $('tabServices').classList.toggle('active', v === 'services');
   $('ordersToolbar').classList.toggle('hidden', !orders);
   $('ordersSection').classList.toggle('hidden', !orders);
-  $('itemsSection').classList.toggle('hidden', orders);
-  if (!orders) refreshItems();
+  $('itemsSection').classList.toggle('hidden', v !== 'items');
+  $('servicesSection').classList.toggle('hidden', v !== 'services');
+  if (v === 'items') refreshItems();
+  if (v === 'services') refreshServices();
 }
 
 async function refreshItems() {
@@ -370,14 +373,131 @@ async function deleteItem(id) {
   }
 }
 
+// ---------------------------------------------------------------- services tab
+let services = [];
+let serviceFilter = '';
+let newServiceIdCounter = 0;
+
+function serviceRowHTML(s) {
+  const id = s.id || '';
+  return `
+  <div class="service-row" data-id="${esc(id)}">
+    <input data-f="name" value="${esc(s.name)}" placeholder="Service name">
+    <input data-f="price" value="${esc(s.price)}" placeholder="Price (THB)">
+    <label class="enabled-toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${s.enabled ? 'checked' : ''}> Enabled</label>
+    <button class="btn btn-small" data-act="save">Save</button>
+    <button class="btn btn-danger btn-small" data-act="del" title="Delete service">✕</button>
+  </div>`;
+}
+
+function renderServices() {
+  const f = serviceFilter.toLowerCase();
+  const rows = services.filter((s) => !f || s.name.toLowerCase().includes(f));
+  $('serviceCount').textContent = `${services.length} total · ${rows.length} shown`;
+  $('servicesList').innerHTML = rows.length
+    ? rows.map(serviceRowHTML).join('')
+    : '<div class="empty">No services yet. Click “+ Add Service” to create one.</div>';
+}
+
+function findServiceByRow(row) {
+  return services.find((x) => (x.id || '') === row.dataset.id);
+}
+
+$('servicesList').addEventListener('input', (e) => {
+  const f = e.target.dataset.f;
+  if (!f) return;
+  const s = findServiceByRow(e.target.closest('.service-row'));
+  if (!s) return;
+  s[f] = f === 'enabled' ? e.target.checked : e.target.value;
+});
+
+$('servicesList').addEventListener('change', (e) => {
+  const f = e.target.dataset.f;
+  if (f === 'enabled') {
+    const s = findServiceByRow(e.target.closest('.service-row'));
+    if (s) s.enabled = e.target.checked;
+  }
+});
+
+$('servicesList').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const row = btn.closest('.service-row');
+  const id = row.dataset.id;
+  if (btn.dataset.act === 'save') saveService(id);
+  else if (btn.dataset.act === 'del') deleteService(id);
+});
+
+window.addServiceRow = function () {
+  services.unshift({ id: 'new-' + (++newServiceIdCounter), name: '', price: '', enabled: true });
+  renderServices();
+  const first = $('servicesList').querySelector('input[data-f="name"]');
+  if (first) first.focus();
+};
+
+async function refreshServices() {
+  try {
+    const { services: list } = await api('/api/admin/services');
+    services = list;
+    renderServices();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function saveService(id) {
+  const s = services.find((x) => (x.id || '') === id);
+  if (!s) return;
+  if (!s.name.trim()) return toast('Service name is required', true);
+  const isNew = String(id).startsWith('new-');
+  const payload = { name: s.name.trim(), price: s.price, enabled: s.enabled !== false };
+  try {
+    if (isNew) {
+      const res = await api('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      services = services.map((x) => (x.id === id ? res.service : x));
+      toast('Service added ✔');
+    } else {
+      await api('/api/admin/services/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      toast('Service saved ✔');
+    }
+    await refreshServices();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function deleteService(id) {
+  if (String(id).startsWith('new-')) {
+    services = services.filter((x) => (x.id || '') !== id);
+    renderServices();
+    return;
+  }
+  const s = services.find((x) => (x.id || '') === id);
+  if (!confirm(`Delete "${s ? s.name : 'this service'}"?`)) return;
+  try {
+    await api('/api/admin/services/' + encodeURIComponent(id), { method: 'DELETE' });
+    toast('Service deleted');
+    await refreshServices();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
 // ---------------------------------------------------------------- wire up
 $('tabOrders').addEventListener('click', () => switchView('orders'));
 $('tabItems').addEventListener('click', () => switchView('items'));
+$('tabServices').addEventListener('click', () => switchView('services'));
 $('addItemBtn').addEventListener('click', addItemRow);
 $('itemFilter').addEventListener('input', (e) => {
   itemFilter = e.target.value;
   clearTimeout(listTimer);
   listTimer = setTimeout(renderItems, 150);
+});
+$('addServiceBtn').addEventListener('click', addServiceRow);
+$('serviceFilter').addEventListener('input', (e) => {
+  serviceFilter = e.target.value;
+  clearTimeout(listTimer);
+  listTimer = setTimeout(renderServices, 150);
 });
 
 $('loginBtn').addEventListener('click', doLogin);

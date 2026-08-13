@@ -274,8 +274,21 @@ textarea { resize: vertical; min-height: 60px; }
   color: var(--muted);
   white-space: nowrap;
 }
+.service-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 130px auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: var(--bg-2);
+}
+.service-row input { padding: 6px 8px; font-size: .85rem; min-width: 0; }
 @media (max-width: 1100px) {
   .item-row { grid-template-columns: 44px 1fr 1fr; }
+  .service-row { grid-template-columns: 1fr auto auto auto; }
 }
 
 /* ---------- Admin ---------- */
