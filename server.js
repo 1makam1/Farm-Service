@@ -17,7 +17,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const DATA_DIR = path.join(ROOT, 'data');
+// DATA_DIR can be overridden (e.g. Render persistent disk mounted at /var/data)
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
 const ITEMS_FILE = path.join(DATA_DIR, 'items.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
@@ -148,10 +149,9 @@ function loadItems() {
 }
 
 function saveItems(next) {
-  itemData = next || itemData;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = ITEMS_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(itemData, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
   fs.renameSync(tmp, ITEMS_FILE);
 }
 
@@ -540,7 +540,7 @@ const server = http.createServer(async (req, res) => {
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         item.id = crypto.randomUUID();
         itemData.items.push(item);
-        saveItems();
+        saveItems(itemData);
         return json(res, 201, { item });
       }
 
@@ -552,7 +552,7 @@ const server = http.createServer(async (req, res) => {
         const { item, errs } = cleanItem(body, itemData.items[idx]);
         if (errs.length) return json(res, 400, { error: errs.join('; ') });
         itemData.items[idx] = item;
-        saveItems();
+        saveItems(itemData);
         return json(res, 200, { item });
       }
 
@@ -560,7 +560,7 @@ const server = http.createServer(async (req, res) => {
         const before = itemData.items.length;
         itemData.items = itemData.items.filter((x) => x.id !== adminItemMatch[1]);
         if (itemData.items.length === before) return json(res, 404, { error: 'Item not found' });
-        saveItems();
+        saveItems(itemData);
         return json(res, 200, { ok: true });
       }
 

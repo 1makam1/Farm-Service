@@ -35,6 +35,21 @@ ADMIN_PASSWORD="your-strong-password" node server.js
 
 ⚠️ **Do not expose the server publicly without changing the password.** Use a long, random one.
 
+## Deploy on Render
+
+1. Create a new **Web Service** on Render and connect the GitHub repo (`1makam1/Farm-Service`).
+2. Settings:
+   - **Build command:** leave empty (the app has no dependencies, no `npm install` needed)
+   - **Start command:** `HOST=0.0.0.0 node server.js`
+3. Environment variables (in the Render dashboard):
+   - `ADMIN_PASSWORD` — your strong admin password (set it **before the first start**)
+   - `HOST` = `0.0.0.0`
+   - `DATA_DIR` = `/var/data` (only if you attach a persistent disk, see below)
+4. **Important — data persistence:** Render's filesystem is wiped on every deploy, which would reset your orders, items, and admin password. To keep data:
+   - **Free tier:** data resets whenever the service restarts/redeploys — fine for testing only.
+   - **Paid (Starter+):** attach a **Persistent Disk** (e.g. 1 GB mounted at `/var/data`) and set `DATA_DIR=/var/data` so orders/items survive redeploys.
+5. The app listens on the `PORT` Render provides automatically.
+
 ## Ports / hosting
 
 - Change port: `PORT=8080 node server.js` (default 3000).
