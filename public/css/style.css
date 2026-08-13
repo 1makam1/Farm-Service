@@ -272,8 +272,19 @@ textarea { resize: vertical; min-height: 60px; }
 .item-row input:focus, .item-row select:focus,
 .service-row input:focus { border-color: var(--accent); }
 
-.ir-top { display: flex; align-items: center; gap: 12px; }
-.ir-top .ir-name { flex: 1; font-size: .95rem; font-weight: 600; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field label {
+  margin: 0 0 4px;
+  font-size: .7rem;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.ir-top { display: flex; align-items: flex-end; gap: 12px; }
+.ir-top .ir-name-field { flex: 1; }
+.ir-name-field input { font-size: .95rem; font-weight: 600; }
 
 .ir-mid {
   display: grid;
@@ -285,9 +296,9 @@ textarea { resize: vertical; min-height: 60px; }
   display: grid;
   grid-template-columns: minmax(0, 2fr) auto;
   gap: 10px;
-  align-items: center;
+  align-items: end;
 }
-.ir-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.ir-actions { display: flex; gap: 8px; justify-content: flex-end; padding-bottom: 2px; }
 
 .item-thumb {
   width: 52px;

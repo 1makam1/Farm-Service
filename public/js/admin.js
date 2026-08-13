@@ -276,17 +276,35 @@ function rowHTML(it) {
   <div class="item-row" data-id="${esc(id)}">
     <div class="ir-top">
       <img class="item-thumb" src="${esc(it.image || '')}" alt="" onerror="this.style.visibility='hidden'">
-      <input class="ir-name" data-f="name" value="${esc(it.name)}" placeholder="Item name">
+      <div class="field ir-name-field">
+        <label>Name</label>
+        <input class="ir-name" data-f="name" value="${esc(it.name)}" placeholder="e.g. Saber">
+      </div>
       <label class="toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${it.enabled ? 'checked' : ''}><span class="tk"></span><span>Enabled</span></label>
     </div>
     <div class="ir-mid">
-      <input data-f="image" value="${esc(it.image || '')}" placeholder="Image URL or /img/items/x.webp">
-      <input type="number" data-f="price" value="${esc(it.price)}" min="0" placeholder="Price (THB)">
-      <select data-f="category">${ITEM_CATS.map((c) => `<option value="${c.id}" ${it.category === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
-      <select data-f="rarity">${['Legendary', 'Mythical'].map((r) => `<option ${it.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+      <div class="field">
+        <label>Image URL</label>
+        <input data-f="image" value="${esc(it.image || '')}" placeholder="e.g. /img/items/saber.webp">
+      </div>
+      <div class="field">
+        <label>Price (THB)</label>
+        <input type="number" data-f="price" value="${esc(it.price)}" min="0">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select data-f="category">${ITEM_CATS.map((c) => `<option value="${c.id}" ${it.category === c.id ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <label>Rarity</label>
+        <select data-f="rarity">${['Legendary', 'Mythical'].map((r) => `<option ${it.rarity === r ? 'selected' : ''}>${r}</option>`).join('')}</select>
+      </div>
     </div>
     <div class="ir-bottom">
-      <input data-f="cost" value="${esc(it.cost || '')}" placeholder="How to get (optional)">
+      <div class="field">
+        <label>How to get</label>
+        <input data-f="cost" value="${esc(it.cost || '')}" placeholder="e.g. Drop: Saber Expert">
+      </div>
       <div class="ir-actions">
         <button class="btn btn-small" data-act="save">Save</button>
         <button class="btn btn-danger btn-small" data-act="del" title="Delete item">✕</button>
@@ -391,11 +409,17 @@ function serviceRowHTML(s) {
   return `
   <div class="service-row" data-id="${esc(id)}">
     <div class="ir-top">
-      <input class="ir-name" data-f="name" value="${esc(s.name)}" placeholder="Service name">
+      <div class="field ir-name-field">
+        <label>Service name</label>
+        <input class="ir-name" data-f="name" value="${esc(s.name)}" placeholder="e.g. Full leveling 1 → 2,600 (max)">
+      </div>
       <label class="toggle" title="Show/hide on the public Prices page"><input type="checkbox" data-f="enabled" ${s.enabled ? 'checked' : ''}><span class="tk"></span><span>Enabled</span></label>
     </div>
     <div class="ir-bottom">
-      <input data-f="price" value="${esc(s.price)}" placeholder="Price (THB)">
+      <div class="field">
+        <label>Price (THB)</label>
+        <input data-f="price" value="${esc(s.price)}" placeholder="e.g. 70">
+      </div>
       <div class="ir-actions">
         <button class="btn btn-small" data-act="save">Save</button>
         <button class="btn btn-danger btn-small" data-act="del" title="Delete service">✕</button>
